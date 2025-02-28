@@ -3,6 +3,7 @@ use std::sync::Arc;
 use keystore_rs::{KeyChain, KeyStore};
 use prism_be::app::AppState;
 use prism_be::config::parse_config;
+use prism_be::ops;
 use prism_be::server::run_server;
 use prism_client::SigningKey;
 use prism_da::DataAvailabilityLayer;
@@ -18,22 +19,24 @@ async fn main() {
 
     let app_config = parse_config("config.toml").unwrap();
 
+    tracing::info!("App config: {:?}", app_config);
+
     let db = InMemoryDatabase::new();
-    let (da_layer, _, _) = InMemoryDataAvailabilityLayer::new(5);
+    let (da_layer, _, _) = InMemoryDataAvailabilityLayer::new(3);
 
     let keystore_sk = KeyChain
         .get_or_create_signing_key(&app_config.service_id)
         .map_err(|e| anyhow::anyhow!("Error getting key from store: {}", e))
         .unwrap();
 
-    let sk = SigningKey::Ed25519(Box::new(keystore_sk.clone()));
+    let service_sk = SigningKey::Ed25519(Box::new(keystore_sk.clone()));
 
     let cfg = Config {
         prover: true,
         batcher: true,
-        webserver: WebServerConfig { enabled: true, host: "0.0.0.0".to_string(), port: 50524 },
-        signing_key: sk.clone(),
-        verifying_key: sk.verifying_key(),
+        webserver: WebServerConfig { enabled: false, host: "0.0.0.0".to_string(), port: 50524 },
+        signing_key: service_sk.clone(),
+        verifying_key: service_sk.verifying_key(),
         start_height: 1,
     };
 
@@ -46,6 +49,19 @@ async fn main() {
         .unwrap(),
     );
 
+    let state = Arc::new(AppState {
+        prover: prover.clone(),
+        service_id: app_config.service_id.clone(),
+        service_sk,
+    });
+
+    let state_clone = state.clone();
+
+    let server_handle = spawn(async move {
+        tracing::info!("Starting server...");
+        run_server(state_clone, app_config).await;
+    });
+
     let runner = prover.clone();
     let runner_handle = spawn(async move {
         tracing::debug!("starting prover");
@@ -54,12 +70,7 @@ async fn main() {
         }
     });
 
-    let state = AppState { prover, service_id: app_config.service_id.clone(), service_sk: sk };
-
-    let server_handle = spawn(async move {
-        tracing::info!("Starting server...");
-        run_server(state, app_config).await;
-    });
+    ops::register_service(state).await.unwrap();
 
     tokio::select! {
         _ = runner_handle => {
