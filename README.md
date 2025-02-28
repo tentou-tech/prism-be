@@ -86,6 +86,49 @@ Adds data to an account with signature verification.
 }
 ```
 
+
+## Signature Verification System
+
+### SignatureBundle
+The `SignatureBundle` is a crucial component used for cryptographic verification of operations. It contains:
+- The signature data
+- Additional metadata for verification
+
+This structure is used in several contexts:
+1. **Account Creation**: Verifies the ownership of the wallet address
+2. **Key Addition**: Ensures only authorized users can add new keys
+3. **Data Operations**: 
+   - `data_signature`: Verifies the integrity of the data being stored
+   - `signature`: Verifies the authorization of the operation itself
+
+### Usage Examples
+
+#### Creating an Account
+```json
+{
+    "wallet_address": "0x123...abc",
+    "pub_key": "base64_encoded_public_key",
+    "signature": {
+        // SignatureBundle fields
+        // Include actual structure based on your implementation
+    }
+}
+```
+
+Adding Data with Double Signatures
+```json
+{
+    "wallet_address": "0x123...abc",
+    "data": "base64_encoded_data",
+    "data_signature": {
+        // SignatureBundle for data verification
+    },
+    "signature": {
+        // SignatureBundle for operation authorization
+    }
+}
+```
+
 ## Technical Stack
 
 - **Framework**: [Axum](https://github.com/tokio-rs/axum) - A modern Rust web framework
@@ -119,23 +162,6 @@ cargo build
 RUST_LOG=debug cargo run
 ```
 
-## Security Features
-
-The service implements several security measures:
-- Cryptographic signature verification for all account operations
-- Wallet address validation
-- Public key verification
-- Separate signatures for data and operations
-- Thread-safe state management using `Arc`
-
-## Error Handling
-
-Current implementation uses `unwrap()` for error handling. In production, it's recommended to:
-- Implement proper error propagation
-- Add custom error types
-- Handle all potential failure cases
-- Add proper logging and monitoring
-
 ## Project Structure
 
 ```
@@ -145,25 +171,3 @@ src/
   ├── config.rs    - Configuration handling
   └── ops/         - Core operations implementation
 ```
-
-## Contributing
-
-[Add contribution guidelines here]
-
-## License
-
-[Add your license information here]
-```
-
-This updated README maintains the existing structure while adding:
-1. More detailed API documentation
-2. Technical implementation details
-3. Security considerations
-4. Project structure
-5. Clear development instructions
-
-Would you like me to:
-1. Add more specific details about any section?
-2. Include additional sections?
-3. Modify the formatting or structure?
-4. Add examples of using the API endpoints?
