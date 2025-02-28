@@ -2,15 +2,20 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use prism_client::{
-    Account, PendingTransaction as _, PrismApi as _, SignatureBundle, VerifyingKey,
+    Account, AccountResponse, PendingTransaction as _, PrismApi as _, SignatureBundle, VerifyingKey,
 };
 
 use crate::app::AppState;
 
+pub async fn get_account(app: Arc<AppState>, user_id: String) -> anyhow::Result<AccountResponse> {
+    let account = app.prover.clone().get_account(&user_id).await?;
+    Ok(account)
+}
+
 // Register service to be able to create accounts
 pub async fn register_service(app: Arc<AppState>) -> anyhow::Result<()> {
     // First, we make sure the service is not already registered.
-    if app.prover.get_account(&app.service_id).await?.account.is_some() {
+    if app.prover.clone().get_account(&app.service_id).await?.account.is_some() {
         tracing::info!("Service already registered.");
         return Ok(());
     }
@@ -20,7 +25,7 @@ pub async fn register_service(app: Arc<AppState>) -> anyhow::Result<()> {
     // service id -- only allowing this keypair to authorize account creations
     // from the service.
     tracing::info!("Submitting transaction to register service");
-    app.prover.register_service(app.service_id.clone(), vk, &app.service_sk).await?.wait().await?;
+    app.prover.clone().register_service(app.service_id.clone(), vk, &app.service_sk).await?.wait().await?;
 
     Ok(())
 }
@@ -38,6 +43,7 @@ pub async fn create_account(
     }
     let unsigned_tx = app
         .prover
+        .clone()
         .build_request()
         .create_account()
         .with_id(user_id.clone())
@@ -52,7 +58,7 @@ pub async fn create_account(
     account.process_transaction(&tx)?;
 
     tracing::info!("Submitting transaction to create account {}", &user_id);
-    app.prover.validate_and_queue_update(tx.clone()).await?;
+    app.prover.clone().validate_and_queue_update(tx.clone()).await?;
 
     Ok(account)
 }
@@ -64,17 +70,17 @@ pub async fn add_key(
     new_key: VerifyingKey,
     signature_bundle: SignatureBundle,
 ) -> anyhow::Result<Account> {
-    if let Some(mut account) = app.prover.get_account(&user_id).await?.account {
+    if let Some(mut account) = app.prover.clone().get_account(&user_id).await?.account {
         tracing::info!("Submitting transaction to add key to account {}", &user_id);
 
         let unsigned_tx =
-            app.prover.build_request().to_modify_account(&account).add_key(new_key)?.transaction();
+            app.prover.clone().build_request().to_modify_account(&account).add_key(new_key)?.transaction();
 
         let tx = unsigned_tx.externally_signed(signature_bundle);
         account.process_transaction(&tx)?;
 
         tracing::info!("Submitting transaction to add key to account {}", &user_id);
-        app.prover.validate_and_queue_update(tx.clone()).await?;
+        app.prover.clone().validate_and_queue_update(tx.clone()).await?;
 
         return Ok(account);
     };
@@ -90,7 +96,7 @@ pub async fn add_data(
     data_signature: SignatureBundle,
     signature_bundle: SignatureBundle,
 ) -> anyhow::Result<Account> {
-    if let Some(mut account) = app.prover.get_account(&user_id).await?.account {
+    if let Some(mut account) = app.prover.clone().get_account(&user_id).await?.account {
         tracing::info!("Submitting transaction to add data to account {}", &user_id);
         let unsigned_tx = app
             .prover
@@ -103,7 +109,7 @@ pub async fn add_data(
         account.process_transaction(&tx)?;
 
         tracing::info!("Submitting transaction to add data to account {}", &user_id);
-        app.prover.validate_and_queue_update(tx.clone()).await?;
+        app.prover.clone().validate_and_queue_update(tx.clone()).await?;
 
         return Ok(account);
     };

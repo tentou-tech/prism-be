@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::app::AppState;
 use crate::config::Config;
-use crate::ops::{add_data, add_key, create_account};
+use crate::ops::{add_data, add_key, create_account, get_account};
 
 #[derive(Deserialize, Serialize, Debug)]
 struct CreateAccountRequest {
@@ -40,6 +40,11 @@ struct AccountResponse {
     id: String,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+struct GetAccountRequest {
+    wallet_address: String,
+}
+
 pub async fn run_server(app_state: Arc<AppState>, config: Config) {
     // Wrap app_state in Arc
     let app_state = app_state.clone();
@@ -47,6 +52,7 @@ pub async fn run_server(app_state: Arc<AppState>, config: Config) {
     // Build the router
     let app = Router::new()
         .route("/v1/health", get(health_check_handler))
+        .route("/v1/account/get", get(get_account_handler))
         .route("/v1/account/create", post(create_account_handler))
         .route("/v1/account/add_key", post(add_key_handler))
         .route("/v1/account/add_data", post(add_data_handler))
@@ -97,4 +103,15 @@ async fn add_data_handler(
         .unwrap();
 
     (StatusCode::OK, Json(AccountResponse { id: account.id().to_string() }))
+}
+
+async fn get_account_handler(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<GetAccountRequest>,
+) -> impl IntoResponse {
+    tracing::info!("Getting account for {}", req.wallet_address);
+    let state = state.clone();
+    let account = get_account(state, req.wallet_address).await.unwrap();
+
+    (StatusCode::OK, Json(account))
 }

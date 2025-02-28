@@ -7,10 +7,12 @@ version = "0.1.0"
 anyhow = "1.0.96"
 axum = "0.8.1"
 keystore-rs = {version = "0.3"}
-prism-client = {git = "https://github.com/deltadevsde/prism", branch = "main"}
-prism-da = {git = "https://github.com/deltadevsde/prism", branch = "main"}
-prism-prover = {git = "https://github.com/deltadevsde/prism", branch = "main"}
-prism-storage = {git = "https://github.com/deltadevsde/prism", branch = "main"}
+prism-client = {path = "../prism/crates/client", features = ["mockall"]}
+prism-da = {path = "../prism/crates/da"}
+prism-prover = {path = "../prism/crates/node_types/prover", features = [
+  "mock_prover",
+]}
+prism-storage = {path = "../prism/crates/storage"}
 serde = {version = "1.0", features = ["derive"]}
 tokio = {version = "1.0", features = ["full"]}
 toml = "0.8.20"

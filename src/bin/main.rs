@@ -34,7 +34,7 @@ async fn main() {
     let cfg = Config {
         prover: true,
         batcher: true,
-        webserver: WebServerConfig { enabled: false, host: "0.0.0.0".to_string(), port: 50524 },
+        webserver: WebServerConfig { enabled: false, host: "0.0.0.0".to_string(), port: 0 },
         signing_key: service_sk.clone(),
         verifying_key: service_sk.verifying_key(),
         start_height: 1,

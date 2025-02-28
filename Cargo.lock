@@ -6120,7 +6120,6 @@ dependencies = [
 [[package]]
 name = "prism-client"
 version = "0.1.0"
-source = "git+https://github.com/deltadevsde/prism?branch=main#cefe27a0d6e0618adb88f9f2c90bbe51e386cd46"
 dependencies = [
  "async-trait",
  "prism-common",
@@ -6135,11 +6134,11 @@ dependencies = [
 [[package]]
 name = "prism-common"
 version = "0.1.0"
-source = "git+https://github.com/deltadevsde/prism?branch=main#cefe27a0d6e0618adb88f9f2c90bbe51e386cd46"
 dependencies = [
  "anyhow",
  "async-trait",
  "celestia-types 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mockall",
  "prism-keys",
  "prism-serde",
  "rand",
@@ -6151,7 +6150,6 @@ dependencies = [
 [[package]]
 name = "prism-da"
 version = "0.1.0"
-source = "git+https://github.com/deltadevsde/prism?branch=main#cefe27a0d6e0618adb88f9f2c90bbe51e386cd46"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6178,7 +6176,6 @@ dependencies = [
 [[package]]
 name = "prism-errors"
 version = "0.1.0"
-source = "git+https://github.com/deltadevsde/prism?branch=main#cefe27a0d6e0618adb88f9f2c90bbe51e386cd46"
 dependencies = [
  "anyhow",
  "thiserror 1.0.69",
@@ -6187,7 +6184,6 @@ dependencies = [
 [[package]]
 name = "prism-keys"
 version = "0.1.0"
-source = "git+https://github.com/deltadevsde/prism?branch=main#cefe27a0d6e0618adb88f9f2c90bbe51e386cd46"
 dependencies = [
  "alloy-primitives",
  "anyhow",
@@ -6207,7 +6203,6 @@ dependencies = [
 [[package]]
 name = "prism-prover"
 version = "0.1.0"
-source = "git+https://github.com/deltadevsde/prism?branch=main#cefe27a0d6e0618adb88f9f2c90bbe51e386cd46"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6232,7 +6227,6 @@ dependencies = [
 [[package]]
 name = "prism-serde"
 version = "0.1.0"
-source = "git+https://github.com/deltadevsde/prism?branch=main#cefe27a0d6e0618adb88f9f2c90bbe51e386cd46"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -6246,7 +6240,6 @@ dependencies = [
 [[package]]
 name = "prism-storage"
 version = "0.1.0"
-source = "git+https://github.com/deltadevsde/prism?branch=main#cefe27a0d6e0618adb88f9f2c90bbe51e386cd46"
 dependencies = [
  "anyhow",
  "auto_impl",
@@ -6263,7 +6256,6 @@ dependencies = [
 [[package]]
 name = "prism-tree"
 version = "0.1.0"
-source = "git+https://github.com/deltadevsde/prism?branch=main#cefe27a0d6e0618adb88f9f2c90bbe51e386cd46"
 dependencies = [
  "anyhow",
  "jmt",
