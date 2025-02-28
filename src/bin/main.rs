@@ -49,11 +49,7 @@ async fn main() {
         .unwrap(),
     );
 
-    let state = Arc::new(AppState {
-        prover: prover.clone(),
-        service_id: app_config.service_id.clone(),
-        service_sk,
-    });
+    let state = Arc::new(AppState::new(prover.clone(), app_config.service_id.clone(), service_sk));
 
     let state_clone = state.clone();
 

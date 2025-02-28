@@ -25,7 +25,15 @@ pub async fn register_service(app: Arc<AppState>) -> anyhow::Result<()> {
     // service id -- only allowing this keypair to authorize account creations
     // from the service.
     tracing::info!("Submitting transaction to register service");
-    app.prover.clone().register_service(app.service_id.clone(), vk, &app.service_sk).await?.wait().await?;
+    let account = app
+        .prover
+        .clone()
+        .register_service(app.service_id.clone(), vk, &app.service_sk)
+        .await?
+        .wait()
+        .await?;
+
+    app.db.insert_account(app.service_id.clone(), account.clone());
 
     Ok(())
 }
@@ -60,6 +68,8 @@ pub async fn create_account(
     tracing::info!("Submitting transaction to create account {}", &user_id);
     app.prover.clone().validate_and_queue_update(tx.clone()).await?;
 
+    app.db.insert_account(user_id.clone(), account.clone());
+
     Ok(account)
 }
 
@@ -73,14 +83,21 @@ pub async fn add_key(
     if let Some(mut account) = app.prover.clone().get_account(&user_id).await?.account {
         tracing::info!("Submitting transaction to add key to account {}", &user_id);
 
-        let unsigned_tx =
-            app.prover.clone().build_request().to_modify_account(&account).add_key(new_key)?.transaction();
+        let unsigned_tx = app
+            .prover
+            .clone()
+            .build_request()
+            .to_modify_account(&account)
+            .add_key(new_key.clone())?
+            .transaction();
 
         let tx = unsigned_tx.externally_signed(signature_bundle);
         account.process_transaction(&tx)?;
 
         tracing::info!("Submitting transaction to add key to account {}", &user_id);
         app.prover.clone().validate_and_queue_update(tx.clone()).await?;
+
+        app.db.insert_key(user_id.clone(), new_key.clone());
 
         return Ok(account);
     };
@@ -115,4 +132,25 @@ pub async fn add_data(
     };
 
     Err(anyhow!("Account {} not found", &user_id))
+}
+
+#[cfg(test)]
+mod tests {
+    use prism_client::SigningKey;
+
+    #[test]
+    fn test_print_info() {
+        let service_signing_key = SigningKey::new_ed25519();
+
+        let username = "test_user".to_string();
+        let user_identity_signing_key = SigningKey::new_cosmos_adr36();
+        let user_identity_verifying_key = user_identity_signing_key.verifying_key();
+
+        println!("username: {:?}", username);
+        println!("user_identity_verifying_key: {:?}", user_identity_verifying_key.to_string());
+        println!(
+            "service_signing_verifying_key: {:?}",
+            service_signing_key.verifying_key().to_string()
+        );
+    }
 }
