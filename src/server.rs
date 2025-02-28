@@ -6,18 +6,28 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use prism_client::{SignatureBundle, VerifyingKey};
+use prism_client::SignatureBundle;
+use prism_keys::VerifyingKey;
 use serde::{Deserialize, Serialize};
 
 use crate::app::AppState;
 use crate::config::AppConfig;
-use crate::ops::{add_data, add_key, create_account, get_account};
+use crate::ops::{add_data, add_key, get_account, request_create_account, send_create_account};
+use crate::utils::{parse_cosmos_adr36_verifying_key, parse_signature_bundle};
 
 #[derive(Deserialize, Serialize, Debug)]
-struct CreateAccountRequest {
+struct SendCreateAccountRequest {
     id: String,
-    pub_key: String,
-    signature: SignatureBundle,
+    // The verifying key is in base64 format
+    verifying_key: String,
+    // The signature is in base64 format
+    signature: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct RequestCreateAccountRequest {
+    id: String,
+    verifying_key: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -41,6 +51,11 @@ struct AccountResponse {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+struct RequestCreateAccountResponse {
+    payload: Vec<u8>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 struct GetAccountRequest {
     id: String,
 }
@@ -58,7 +73,8 @@ pub async fn run_server(app_state: Arc<AppState>, config: AppConfig) {
     let app = Router::new()
         .route("/v1/health", get(health_check_handler))
         .route("/v1/account/get", get(get_account_handler))
-        .route("/v1/account/create", post(create_account_handler))
+        .route("/v1/account/send-create", post(send_create_account_handler))
+        .route("/v1/account/request-create", post(request_create_account_handler))
         .route("/v1/account/add-key", post(add_key_handler))
         .route("/v1/account/add-data", post(add_data_handler))
         .route("/v1/account/list-accounts", get(list_accounts_handler))
@@ -79,12 +95,24 @@ async fn health_check_handler() -> impl IntoResponse {
     (StatusCode::OK, "OK")
 }
 
-async fn create_account_handler(
+async fn request_create_account_handler(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<CreateAccountRequest>,
+    Json(req): Json<RequestCreateAccountRequest>,
 ) -> impl IntoResponse {
     let state = state.clone();
-    let account = create_account(state, req.id, req.signature).await.unwrap();
+    let verifying_key = parse_cosmos_adr36_verifying_key(req.verifying_key).unwrap();
+    let bytes_to_be_signed = request_create_account(state, req.id, verifying_key).await.unwrap();
+
+    (StatusCode::OK, Json(RequestCreateAccountResponse { payload: bytes_to_be_signed }))
+}
+
+async fn send_create_account_handler(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<SendCreateAccountRequest>,
+) -> impl IntoResponse {
+    let state = state.clone();
+    let signature_bundle = parse_signature_bundle(req.verifying_key, req.signature).unwrap();
+    let account = send_create_account(state, req.id, signature_bundle).await.unwrap();
 
     (StatusCode::OK, Json(AccountResponse { id: account.id().to_string() }))
 }

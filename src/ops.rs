@@ -38,8 +38,29 @@ pub async fn register_service(app: Arc<AppState>) -> anyhow::Result<()> {
     Ok(())
 }
 
-// Create an account with given user id
-pub async fn create_account(
+// Request signing payload to create an account with given user id
+pub async fn request_create_account(
+    app: Arc<AppState>,
+    user_id: String,
+    verifying_key: VerifyingKey,
+) -> anyhow::Result<Vec<u8>> {
+    let bytes_to_be_signed = app
+        .prover
+        .clone()
+        .build_request()
+        .create_account()
+        .with_id(user_id)
+        .with_key(verifying_key)
+        .for_service_with_id(app.service_id.clone())
+        .meeting_signed_challenge(&app.service_sk)?
+        .transaction()
+        .signing_payload()?;
+
+    Ok(bytes_to_be_signed)
+}
+
+// Send a request to create an account with given user id
+pub async fn send_create_account(
     app: Arc<AppState>,
     user_id: String,
     signature_bundle: SignatureBundle,

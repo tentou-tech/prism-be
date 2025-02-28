@@ -9,9 +9,11 @@ axum = "0.8.1"
 keystore-rs = {version = "0.3"}
 prism-client = {path = "../prism/crates/client", features = ["mockall"]}
 prism-da = {path = "../prism/crates/da"}
+prism-keys = {path = "../prism/crates/keys"}
 prism-prover = {path = "../prism/crates/node_types/prover", features = [
   "mock_prover",
 ]}
+prism-serde = {path = "../prism/crates/serde"}
 prism-storage = {path = "../prism/crates/storage"}
 serde = {version = "1.0", features = ["derive"]}
 tokio = {version = "1.0", features = ["full"]}
