@@ -36,6 +36,6 @@ impl Database {
     }
 
     pub fn insert_key(&self, id: String, key: VerifyingKey) {
-        self.keys.lock().unwrap().entry(id).or_insert_with(Vec::new).push(key);
+        self.keys.lock().unwrap().entry(id).or_default().push(key);
     }
 }

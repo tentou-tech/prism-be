@@ -7,10 +7,9 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use prism_client::SignatureBundle;
-use prism_keys::VerifyingKey;
 use serde::{Deserialize, Serialize};
 
-use crate::app::AppState;
+use crate::app::{AppError, AppState, HandlerResult};
 use crate::config::AppConfig;
 use crate::ops::{add_data, add_key, get_account, request_create_account, send_create_account};
 use crate::utils::{parse_cosmos_adr36_verifying_key, parse_signature_bundle};
@@ -65,6 +64,8 @@ struct ListKeysRequest {
     id: String,
 }
 
+// Run the server with the given app state and config
+// Panics if the server fails to start
 pub async fn run_server(app_state: Arc<AppState>, config: AppConfig) {
     // Wrap app_state in Arc
     let app_state = app_state.clone();
@@ -98,71 +99,85 @@ async fn health_check_handler() -> impl IntoResponse {
 async fn request_create_account_handler(
     State(state): State<Arc<AppState>>,
     Json(req): Json<RequestCreateAccountRequest>,
-) -> impl IntoResponse {
+) -> HandlerResult<impl IntoResponse> {
     let state = state.clone();
-    let verifying_key = parse_cosmos_adr36_verifying_key(req.verifying_key).unwrap();
-    let bytes_to_be_signed = request_create_account(state, req.id, verifying_key).await.unwrap();
+    let verifying_key = parse_cosmos_adr36_verifying_key(req.verifying_key)
+        .map_err(|e| AppError(anyhow::anyhow!("Invalid verifying key: {}", e)))?;
+    let bytes_to_be_signed = request_create_account(state, req.id, verifying_key)
+        .await
+        .map_err(|e| AppError(anyhow::anyhow!("Failed to request account creation: {}", e)))?;
 
-    (StatusCode::OK, Json(RequestCreateAccountResponse { payload: bytes_to_be_signed }))
+    Ok((StatusCode::OK, Json(RequestCreateAccountResponse { payload: bytes_to_be_signed })))
 }
 
 async fn send_create_account_handler(
     State(state): State<Arc<AppState>>,
     Json(req): Json<SendCreateAccountRequest>,
-) -> impl IntoResponse {
+) -> HandlerResult<impl IntoResponse> {
     let state = state.clone();
-    let signature_bundle = parse_signature_bundle(req.verifying_key, req.signature).unwrap();
-    let account = send_create_account(state, req.id, signature_bundle).await.unwrap();
+    let signature_bundle = parse_signature_bundle(req.verifying_key, req.signature)
+        .map_err(|e| AppError(anyhow::anyhow!("Invalid signature bundle: {}", e)))?;
+    let account = send_create_account(state, req.id, signature_bundle)
+        .await
+        .map_err(|e| AppError(anyhow::anyhow!("Failed to send account creation: {}", e)))?;
 
-    (StatusCode::OK, Json(AccountResponse { id: account.id().to_string() }))
+    Ok((StatusCode::OK, Json(AccountResponse { id: account.id().to_string() })))
 }
 
 async fn add_key_handler(
     State(state): State<Arc<AppState>>,
     Json(req): Json<AddKeyRequest>,
-) -> impl IntoResponse {
+) -> HandlerResult<impl IntoResponse> {
     let state = state.clone();
-    let new_key = VerifyingKey::try_from(req.pub_key).unwrap();
-    let account = add_key(state, req.id, new_key, req.signature).await.unwrap();
+    let new_key = parse_cosmos_adr36_verifying_key(req.pub_key)
+        .map_err(|e| AppError(anyhow::anyhow!("Invalid verifying key: {}", e)))?;
+    let account = add_key(state, req.id, new_key, req.signature)
+        .await
+        .map_err(|e| AppError(anyhow::anyhow!("Failed to add key: {}", e)))?;
 
-    (StatusCode::OK, Json(AccountResponse { id: account.id().to_string() }))
+    Ok((StatusCode::OK, Json(AccountResponse { id: account.id().to_string() })))
 }
 
 async fn add_data_handler(
     State(state): State<Arc<AppState>>,
     Json(req): Json<AddDataRequest>,
-) -> impl IntoResponse {
+) -> HandlerResult<impl IntoResponse> {
     let state = state.clone();
-    let account =
-        add_data(state, req.id, req.data, req.data_signature, req.signature).await.unwrap();
+    let account = add_data(state, req.id, req.data, req.data_signature, req.signature)
+        .await
+        .map_err(|e| AppError(anyhow::anyhow!("Failed to add data: {}", e)))?;
 
-    (StatusCode::OK, Json(AccountResponse { id: account.id().to_string() }))
+    Ok((StatusCode::OK, Json(AccountResponse { id: account.id().to_string() })))
 }
 
 async fn get_account_handler(
     State(state): State<Arc<AppState>>,
     Json(req): Json<GetAccountRequest>,
-) -> impl IntoResponse {
+) -> HandlerResult<impl IntoResponse> {
     tracing::info!("Getting account for {}", req.id);
     let state = state.clone();
-    let account = get_account(state, req.id).await.unwrap();
+    let account = get_account(state, req.id)
+        .await
+        .map_err(|e| AppError(anyhow::anyhow!("Failed to get account: {}", e)))?;
 
-    (StatusCode::OK, Json(account))
+    Ok((StatusCode::OK, Json(account)))
 }
 
-async fn list_accounts_handler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+async fn list_accounts_handler(
+    State(state): State<Arc<AppState>>,
+) -> HandlerResult<impl IntoResponse> {
     let state = state.clone();
     let accounts = state.db.clone().get_accounts();
 
-    (StatusCode::OK, Json(accounts))
+    Ok((StatusCode::OK, Json(accounts)))
 }
 
 async fn list_keys_handler(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ListKeysRequest>,
-) -> impl IntoResponse {
+) -> HandlerResult<impl IntoResponse> {
     let state = state.clone();
     let keys = state.db.clone().get_keys(req.id);
 
-    (StatusCode::OK, Json(keys))
+    Ok((StatusCode::OK, Json(keys)))
 }
