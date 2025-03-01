@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
@@ -65,10 +65,6 @@ struct RequestCreateAccountResponse {
     payload: Vec<u8>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
-struct GetDataRequest {
-    id: String,
-}
 
 #[derive(Deserialize, Serialize, Debug)]
 struct GetDataResponse {
@@ -76,17 +72,7 @@ struct GetDataResponse {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-struct GetAccountRequest {
-    id: String,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
 struct ListKeysRequest {
-    id: String,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-struct GetKeyRequest {
     id: String,
 }
 
@@ -182,19 +168,19 @@ async fn add_key_handler(
 
 async fn get_data_handler(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<GetDataRequest>,
+    Path(id): Path<String>,
 ) -> HandlerResult<impl IntoResponse> {
     let state = state.clone();
-    let data = state.db.clone().get_data(req.id);
+    let data = state.db.clone().get_data(id);
     Ok((StatusCode::OK, Json(GetDataResponse { data })))
 }
 
 async fn get_key_handler(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<GetKeyRequest>,
+    Path(id): Path<String>,
 ) -> HandlerResult<impl IntoResponse> {
     let state = state.clone();
-    let key = state.db.clone().get_key(req.id);
+    let key = state.db.clone().get_key(id);
     Ok((StatusCode::OK, Json(GetKeyResponse { key })))
 }
 
@@ -209,11 +195,11 @@ async fn add_data_handler(
 
 async fn get_account_handler(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<GetAccountRequest>,
+    Path(id): Path<String>,
 ) -> HandlerResult<impl IntoResponse> {
-    tracing::info!("Getting account for {}", req.id);
+    tracing::info!("Getting account for {}", id);
     let state = state.clone();
-    let account = get_account(state, req.id)
+    let account = get_account(state, id)
         .await
         .map_err(|e| AppError(anyhow::anyhow!("Failed to get account: {}", e)))?;
 
@@ -260,10 +246,10 @@ async fn list_accounts_handler(
 
 async fn list_keys_handler(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<ListKeysRequest>,
+    Path(id): Path<String>,
 ) -> HandlerResult<impl IntoResponse> {
     let state = state.clone();
-    let keys = state.db.clone().get_keys(req.id);
+    let keys = state.db.clone().get_keys(id);
 
     Ok((StatusCode::OK, Json(keys)))
 }
