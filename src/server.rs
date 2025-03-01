@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
@@ -65,7 +65,6 @@ struct RequestCreateAccountResponse {
     payload: Vec<u8>,
 }
 
-
 #[derive(Deserialize, Serialize, Debug)]
 struct GetDataResponse {
     data: Vec<String>,
@@ -86,6 +85,11 @@ struct GetKeyResponse {
     key: Vec<String>,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+struct GetAccountQuery {
+    id: String,
+}
+
 // Run the server with the given app state and config
 // Panics if the server fails to start
 pub async fn run_server(app_state: Arc<AppState>, config: AppConfig) {
@@ -97,10 +101,10 @@ pub async fn run_server(app_state: Arc<AppState>, config: AppConfig) {
     // Build the router
     let app = Router::new()
         .route("/v1/health", get(health_check_handler))
-        .route("/v1/account/get/:id", get(get_account_handler))
+        .route("/v1/account/get", get(get_account_handler))
         .route("/v1/account/add-manual", post(add_account_handler))
-        .route("/v1/account/get-key/:id", get(get_key_handler))
-        .route("/v1/account/get-data/:id", get(get_data_handler))
+        .route("/v1/account/get-key", get(get_key_handler))
+        .route("/v1/account/get-data", get(get_data_handler))
         .route("/v1/account/send-create", post(send_create_account_handler))
         .route("/v1/account/request-create", post(request_create_account_handler))
         .route("/v1/account/add-key", post(add_key_handler))
@@ -166,21 +170,30 @@ async fn add_key_handler(
     Ok((StatusCode::OK, Json(AccountResult { id: account.id().to_string() })))
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+struct GetDataQuery {
+    id: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct GetKeyQuery {
+    id: String,
+}
 async fn get_data_handler(
     State(state): State<Arc<AppState>>,
-    Path(id): Path<String>,
+    Query(query): Query<GetDataQuery>,
 ) -> HandlerResult<impl IntoResponse> {
     let state = state.clone();
-    let data = state.db.clone().get_data(id);
+    let data = state.db.clone().get_data(query.id);
     Ok((StatusCode::OK, Json(GetDataResponse { data })))
 }
 
 async fn get_key_handler(
     State(state): State<Arc<AppState>>,
-    Path(id): Path<String>,
+    Query(query): Query<GetKeyQuery>,
 ) -> HandlerResult<impl IntoResponse> {
     let state = state.clone();
-    let key = state.db.clone().get_key(id);
+    let key = state.db.clone().get_key(query.id);
     Ok((StatusCode::OK, Json(GetKeyResponse { key })))
 }
 
@@ -195,11 +208,11 @@ async fn add_data_handler(
 
 async fn get_account_handler(
     State(state): State<Arc<AppState>>,
-    Path(id): Path<String>,
+    Query(query): Query<GetAccountQuery>,
 ) -> HandlerResult<impl IntoResponse> {
-    tracing::info!("Getting account for {}", id);
+    tracing::info!("Getting account for {}", query.id);
     let state = state.clone();
-    let account = get_account(state, id)
+    let account = get_account(state, query.id)
         .await
         .map_err(|e| AppError(anyhow::anyhow!("Failed to get account: {}", e)))?;
 
