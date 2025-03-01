@@ -224,8 +224,7 @@ async fn get_account_handler(
 
     let off_chain_data: Vec<String> = state.db.clone().get_data(query.id.clone());
 
-    let data: Vec<String> =
-        onchain_data.iter().chain(off_chain_data.iter()).map(|data| data.clone()).collect();
+    let data: Vec<String> = onchain_data.iter().chain(off_chain_data.iter()).cloned().collect();
 
     let info = AccountInfo {
         id: account.id().to_string(),
@@ -268,16 +267,10 @@ async fn list_accounts_handler(
                 let offchain_data: Vec<String> = state.db.clone().get_data(id.clone());
                 let offchain_keys: Vec<String> = state.db.clone().get_keys(id.clone());
 
-                let keys: Vec<String> = onchain_keys
-                    .iter()
-                    .chain(offchain_keys.iter())
-                    .map(|key| key.clone())
-                    .collect();
-                let data: Vec<String> = onchain_data
-                    .iter()
-                    .chain(offchain_data.iter())
-                    .map(|data| data.clone())
-                    .collect();
+                let keys: Vec<String> =
+                    onchain_keys.iter().chain(offchain_keys.iter()).cloned().collect();
+                let data: Vec<String> =
+                    onchain_data.iter().chain(offchain_data.iter()).cloned().collect();
                 accounts_info.push(AccountInfo {
                     id: id.clone(),
                     keys: remove_duplicates(keys),
