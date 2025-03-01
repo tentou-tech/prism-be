@@ -19,18 +19,39 @@ Returns the health status of the service.
 
 **Response**: `200 OK` with body "OK"
 
-### Create Account
+### Request Create Account
 ```http
-POST /v1/account/create
+POST /v1/account/request-create
 ```
-Creates a new account with wallet address and signature verification.
+Initiates the account creation process by requesting a payload to sign.
 
 **Request Body**:
 ```json
 {
-    "wallet_address": "string",
-    "pub_key": "string",
-    "signature": SignatureBundle
+    "id": "string",
+    "verifying_key": "string"
+}
+```
+
+**Response**: `200 OK`
+```json
+{
+    "payload": "bytes"
+}
+```
+
+### Send Create Account
+```http
+POST /v1/account/send-create
+```
+Completes the account creation process with the signed payload.
+
+**Request Body**:
+```json
+{
+    "id": "string",
+    "verifying_key": "string",
+    "signature": "string"
 }
 ```
 
@@ -41,18 +62,33 @@ Creates a new account with wallet address and signature verification.
 }
 ```
 
+### Get Account
+```http
+GET /v1/account/get?id=string
+```
+Retrieves account information including keys, data, and nonce.
+
+**Response**: `200 OK`
+```json
+{
+    "id": "string",
+    "nonce": "number",
+    "data": ["string"],
+    "keys": ["string"]
+}
+```
+
 ### Add Key
 ```http
-POST /v1/account/add_key
+POST /v1/account/add-key
 ```
-Adds a new public key to an existing account.
+Adds a new key to an existing account.
 
 **Request Body**:
 ```json
 {
-    "wallet_address": "string",
-    "pub_key": "string",
-    "signature": SignatureBundle
+    "id": "string",
+    "verifying_key": "string"
 }
 ```
 
@@ -65,17 +101,15 @@ Adds a new public key to an existing account.
 
 ### Add Data
 ```http
-POST /v1/account/add_data
+POST /v1/account/add-data
 ```
-Adds data to an account with signature verification.
+Adds data to an existing account.
 
 **Request Body**:
 ```json
 {
-    "wallet_address": "string",
-    "data": "bytes",
-    "data_signature": SignatureBundle,
-    "signature": SignatureBundle
+    "id": "string",
+    "data": "string"
 }
 ```
 
@@ -86,46 +120,80 @@ Adds data to an account with signature verification.
 }
 ```
 
+### Get Data
+```http
+GET /v1/account/get-data?id=string
+```
+Retrieves data associated with an account.
 
-## Signature Verification System
-
-### SignatureBundle
-The `SignatureBundle` is a crucial component used for cryptographic verification of operations. It contains:
-- The signature data
-- Additional metadata for verification
-
-This structure is used in several contexts:
-1. **Account Creation**: Verifies the ownership of the wallet address
-2. **Key Addition**: Ensures only authorized users can add new keys
-3. **Data Operations**: 
-   - `data_signature`: Verifies the integrity of the data being stored
-   - `signature`: Verifies the authorization of the operation itself
-
-### Usage Examples
-
-#### Creating an Account
+**Response**: `200 OK`
 ```json
 {
-    "wallet_address": "0x123...abc",
-    "pub_key": "base64_encoded_public_key",
-    "signature": {
-        // SignatureBundle fields
-        // Include actual structure based on your implementation
-    }
+    "data": ["string"]
 }
 ```
 
-Adding Data with Double Signatures
+### Get Key
+```http
+GET /v1/account/get-key?id=string
+```
+Retrieves keys associated with an account.
+
+**Response**: `200 OK`
 ```json
 {
-    "wallet_address": "0x123...abc",
-    "data": "base64_encoded_data",
-    "data_signature": {
-        // SignatureBundle for data verification
-    },
-    "signature": {
-        // SignatureBundle for operation authorization
-    }
+    "key": ["string"]
+}
+```
+
+### List Accounts
+```http
+GET /v1/account/list-accounts
+```
+Lists all accounts with their associated information.
+
+**Response**: `200 OK`
+```json
+{
+    "accounts": [
+        {
+            "id": "string",
+            "nonce": "number",
+            "data": ["string"],
+            "keys": ["string"]
+        }
+    ]
+}
+```
+
+### List Keys
+```http
+GET /v1/account/list-keys/:id
+```
+Lists all keys for a specific account.
+
+**Response**: `200 OK`
+```json
+["string"]
+```
+
+### Add Account (Manual)
+```http
+POST /v1/account/add-manual
+```
+Manually adds an account (for administrative purposes).
+
+**Request Body**:
+```json
+{
+    "id": "string"
+}
+```
+
+**Response**: `200 OK`
+```json
+{
+    "id": "string"
 }
 ```
 
@@ -135,6 +203,7 @@ Adding Data with Double Signatures
 - **Runtime**: [Tokio](https://tokio.rs/) - Asynchronous runtime for Rust
 - **Serialization**: [Serde](https://serde.rs/) - Serialization/deserialization framework
 - **Cryptography**: Custom signature verification using `SignatureBundle` and `VerifyingKey`
+- **CORS**: Enabled for all origins, methods, and headers
 
 ## Configuration
 
