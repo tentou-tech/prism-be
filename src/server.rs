@@ -97,10 +97,10 @@ pub async fn run_server(app_state: Arc<AppState>, config: AppConfig) {
     // Build the router
     let app = Router::new()
         .route("/v1/health", get(health_check_handler))
-        .route("/v1/account/get", get(get_account_handler))
+        .route("/v1/account/get/:id", get(get_account_handler))
         .route("/v1/account/add-manual", post(add_account_handler))
-        .route("/v1/account/get-key", get(get_key_handler))
-        .route("/v1/account/get-data", get(get_data_handler))
+        .route("/v1/account/get-key/:id", get(get_key_handler))
+        .route("/v1/account/get-data/:id", get(get_data_handler))
         .route("/v1/account/send-create", post(send_create_account_handler))
         .route("/v1/account/request-create", post(request_create_account_handler))
         .route("/v1/account/add-key", post(add_key_handler))
