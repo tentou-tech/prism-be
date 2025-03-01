@@ -6,13 +6,12 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use prism_client::SignatureBundle;
 use serde::{Deserialize, Serialize};
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::app::{AppError, AppState, HandlerResult};
 use crate::config::AppConfig;
-use crate::ops::{add_data, add_key, get_account, request_create_account, send_create_account};
+use crate::ops::{add_key, get_account, request_create_account, send_create_account};
 use crate::utils::{parse_cosmos_adr36_verifying_key, parse_signature_bundle};
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -33,16 +32,13 @@ struct RequestCreateAccountRequest {
 #[derive(Deserialize, Serialize, Debug)]
 struct AddKeyRequest {
     id: String,
-    pub_key: String,
-    signature: SignatureBundle,
+    verifying_key: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 struct AddDataRequest {
     id: String,
-    data: Vec<u8>,
-    data_signature: SignatureBundle,
-    signature: SignatureBundle,
+    data: String,
 }
 
 #[derive(Serialize)]
@@ -56,6 +52,16 @@ struct RequestCreateAccountResponse {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+struct GetDataRequest {
+    id: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct GetDataResponse {
+    data: Vec<String>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 struct GetAccountRequest {
     id: String,
 }
@@ -63,6 +69,16 @@ struct GetAccountRequest {
 #[derive(Deserialize, Serialize, Debug)]
 struct ListKeysRequest {
     id: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct GetKeyRequest {
+    id: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct GetKeyResponse {
+    key: Vec<String>,
 }
 
 // Run the server with the given app state and config
@@ -77,6 +93,8 @@ pub async fn run_server(app_state: Arc<AppState>, config: AppConfig) {
     let app = Router::new()
         .route("/v1/health", get(health_check_handler))
         .route("/v1/account/get", get(get_account_handler))
+        .route("/v1/account/get-key", get(get_key_handler))
+        .route("/v1/account/get-data", get(get_data_handler))
         .route("/v1/account/send-create", post(send_create_account_handler))
         .route("/v1/account/request-create", post(request_create_account_handler))
         .route("/v1/account/add-key", post(add_key_handler))
@@ -133,13 +151,31 @@ async fn add_key_handler(
     Json(req): Json<AddKeyRequest>,
 ) -> HandlerResult<impl IntoResponse> {
     let state = state.clone();
-    let new_key = parse_cosmos_adr36_verifying_key(req.pub_key)
+    let new_key = parse_cosmos_adr36_verifying_key(req.verifying_key)
         .map_err(|e| AppError(anyhow::anyhow!("Invalid verifying key: {}", e)))?;
-    let account = add_key(state, req.id, new_key, req.signature)
+    let account = add_key(state, req.id, new_key)
         .await
         .map_err(|e| AppError(anyhow::anyhow!("Failed to add key: {}", e)))?;
 
     Ok((StatusCode::OK, Json(AccountResponse { id: account.id().to_string() })))
+}
+
+async fn get_data_handler(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<GetDataRequest>,
+) -> HandlerResult<impl IntoResponse> {
+    let state = state.clone();
+    let data = state.db.clone().get_data(req.id);
+    Ok((StatusCode::OK, Json(GetDataResponse { data })))
+}
+
+async fn get_key_handler(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<GetKeyRequest>,
+) -> HandlerResult<impl IntoResponse> {
+    let state = state.clone();
+    let key = state.db.clone().get_key(req.id);
+    Ok((StatusCode::OK, Json(GetKeyResponse { key })))
 }
 
 async fn add_data_handler(
@@ -147,11 +183,8 @@ async fn add_data_handler(
     Json(req): Json<AddDataRequest>,
 ) -> HandlerResult<impl IntoResponse> {
     let state = state.clone();
-    let account = add_data(state, req.id, req.data, req.data_signature, req.signature)
-        .await
-        .map_err(|e| AppError(anyhow::anyhow!("Failed to add data: {}", e)))?;
-
-    Ok((StatusCode::OK, Json(AccountResponse { id: account.id().to_string() })))
+    state.db.clone().insert_data(req.id.clone(), req.data.clone());
+    Ok((StatusCode::OK, Json(AccountResponse { id: req.id })))
 }
 
 async fn get_account_handler(

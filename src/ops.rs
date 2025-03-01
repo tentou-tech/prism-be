@@ -99,26 +99,26 @@ pub async fn add_key(
     app: Arc<AppState>,
     user_id: String,
     new_key: VerifyingKey,
-    signature_bundle: SignatureBundle,
+    // signature_bundle: SignatureBundle,
 ) -> anyhow::Result<Account> {
-    if let Some(mut account) = app.prover.clone().get_account(&user_id).await?.account {
+    if let Some(account) = app.prover.clone().get_account(&user_id).await?.account {
         tracing::info!("Submitting transaction to add key to account {}", &user_id);
 
-        let unsigned_tx = app
-            .prover
-            .clone()
-            .build_request()
-            .to_modify_account(&account)
-            .add_key(new_key.clone())?
-            .transaction();
+        // let unsigned_tx = app
+        //     .prover
+        //     .clone()
+        //     .build_request()
+        //     .to_modify_account(&account)
+        //     .add_key(new_key.clone())?
+        //     .transaction();
 
-        let tx = unsigned_tx.externally_signed(signature_bundle);
-        account.process_transaction(&tx)?;
+        // let tx = unsigned_tx.externally_signed(signature_bundle);
+        // account.process_transaction(&tx)?;
 
-        tracing::info!("Submitting transaction to add key to account {}", &user_id);
-        app.prover.clone().validate_and_queue_update(tx.clone()).await?;
+        // tracing::info!("Submitting transaction to add key to account {}", &user_id);
+        // app.prover.clone().validate_and_queue_update(tx.clone()).await?;
 
-        app.db.insert_key(user_id.clone(), new_key.clone());
+        app.db.insert_key(user_id.clone(), new_key.to_string());
 
         return Ok(account);
     };
@@ -130,24 +130,25 @@ pub async fn add_key(
 pub async fn add_data(
     app: Arc<AppState>,
     user_id: String,
-    data: Vec<u8>,
-    data_signature: SignatureBundle,
-    signature_bundle: SignatureBundle,
+    data: String,
+    // data_signature: SignatureBundle,
+    // signature_bundle: SignatureBundle,
 ) -> anyhow::Result<Account> {
-    if let Some(mut account) = app.prover.clone().get_account(&user_id).await?.account {
+    if let Some(account) = app.prover.clone().get_account(&user_id).await?.account {
         tracing::info!("Submitting transaction to add data to account {}", &user_id);
-        let unsigned_tx = app
-            .prover
-            .build_request()
-            .to_modify_account(&account)
-            .add_data(data, data_signature)?
-            .transaction();
+        // let unsigned_tx = app
+        //     .prover
+        //     .build_request()
+        //     .to_modify_account(&account)
+        //     .add_data(data, data_signature)?
+        //     .transaction();
 
-        let tx = unsigned_tx.externally_signed(signature_bundle);
-        account.process_transaction(&tx)?;
+        // let tx = unsigned_tx.externally_signed(signature_bundle);
+        // account.process_transaction(&tx)?;
 
-        tracing::info!("Submitting transaction to add data to account {}", &user_id);
-        app.prover.clone().validate_and_queue_update(tx.clone()).await?;
+        // tracing::info!("Submitting transaction to add data to account {}", &user_id);
+        // app.prover.clone().validate_and_queue_update(tx.clone()).await?;
+        app.db.insert_data(user_id.clone(), data.clone());
 
         return Ok(account);
     };
