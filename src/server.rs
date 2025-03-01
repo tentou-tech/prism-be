@@ -8,6 +8,7 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use prism_client::SignatureBundle;
 use serde::{Deserialize, Serialize};
+use tower_http::cors::{Any, CorsLayer};
 
 use crate::app::{AppError, AppState, HandlerResult};
 use crate::config::AppConfig;
@@ -70,6 +71,8 @@ pub async fn run_server(app_state: Arc<AppState>, config: AppConfig) {
     // Wrap app_state in Arc
     let app_state = app_state.clone();
 
+    let cors = CorsLayer::new().allow_methods(Any).allow_origin(Any).allow_headers(Any);
+
     // Build the router
     let app = Router::new()
         .route("/v1/health", get(health_check_handler))
@@ -80,7 +83,8 @@ pub async fn run_server(app_state: Arc<AppState>, config: AppConfig) {
         .route("/v1/account/add-data", post(add_data_handler))
         .route("/v1/account/list-accounts", get(list_accounts_handler))
         .route("/v1/account/list-keys", get(list_keys_handler))
-        .with_state(app_state);
+        .with_state(app_state)
+        .layer(cors);
 
     // Run the server
     let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));
