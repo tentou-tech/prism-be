@@ -7,13 +7,14 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use prism_client::Account;
+use prism_serde::base64::ToBase64;
 use serde::{Deserialize, Serialize};
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::app::{AppError, AppState, HandlerResult};
 use crate::config::AppConfig;
 use crate::ops::{add_key, get_account, request_create_account, send_create_account};
-use crate::utils::{parse_cosmos_adr36_verifying_key, parse_signature_bundle};
+use crate::utils::{parse_cosmos_adr36_verifying_key, parse_signature_bundle, remove_duplicates};
 
 #[derive(Deserialize, Serialize, Debug)]
 struct SendCreateAccountRequest {
@@ -212,11 +213,28 @@ async fn get_account_handler(
 ) -> HandlerResult<impl IntoResponse> {
     tracing::info!("Getting account for {}", query.id);
     let state = state.clone();
-    let account = get_account(state, query.id)
+    let account = get_account(state.clone(), query.id.clone())
         .await
         .map_err(|e| AppError(anyhow::anyhow!("Failed to get account: {}", e)))?;
 
-    Ok((StatusCode::OK, Json(account)))
+    let account = account.account.unwrap_or_default();
+
+    let onchain_data: Vec<String> =
+        account.clone().signed_data().iter().map(|data| data.data.to_base64()).collect();
+
+    let off_chain_data: Vec<String> = state.db.clone().get_data(query.id.clone());
+
+    let data: Vec<String> =
+        onchain_data.iter().chain(off_chain_data.iter()).map(|data| data.clone()).collect();
+
+    let info = AccountInfo {
+        id: account.id().to_string(),
+        nonce: account.nonce(),
+        keys: account.valid_keys().iter().map(|key| key.to_string()).collect(),
+        data: remove_duplicates(data),
+    };
+
+    Ok((StatusCode::OK, Json(info)))
 }
 
 async fn add_account_handler(
@@ -238,13 +256,33 @@ async fn list_accounts_handler(
     for id in accounts {
         match get_account(state.clone(), id.clone()).await {
             Ok(account) => {
-                let keys = state.db.clone().get_keys(id.clone());
-                let data = state.db.clone().get_data(id.clone());
+                let account = account.account.unwrap_or_default();
+                let onchain_keys: Vec<String> =
+                    account.clone().valid_keys().iter().map(|key| key.to_string()).collect();
+                let onchain_data: Vec<String> = account
+                    .clone()
+                    .signed_data()
+                    .iter()
+                    .map(|data| data.data.to_base64())
+                    .collect();
+                let offchain_data: Vec<String> = state.db.clone().get_data(id.clone());
+                let offchain_keys: Vec<String> = state.db.clone().get_keys(id.clone());
+
+                let keys: Vec<String> = onchain_keys
+                    .iter()
+                    .chain(offchain_keys.iter())
+                    .map(|key| key.clone())
+                    .collect();
+                let data: Vec<String> = onchain_data
+                    .iter()
+                    .chain(offchain_data.iter())
+                    .map(|data| data.clone())
+                    .collect();
                 accounts_info.push(AccountInfo {
                     id: id.clone(),
-                    keys,
-                    data,
-                    nonce: account.account.unwrap_or_default().nonce(),
+                    keys: remove_duplicates(keys),
+                    data: remove_duplicates(data),
+                    nonce: account.clone().nonce(),
                 });
             }
             Err(e) => {
