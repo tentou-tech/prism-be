@@ -6,6 +6,7 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use prism_client::Account;
 use serde::{Deserialize, Serialize};
 use tower_http::cors::{Any, CorsLayer};
 
@@ -42,8 +43,21 @@ struct AddDataRequest {
 }
 
 #[derive(Serialize)]
-struct AccountResponse {
+struct AccountResult {
     id: String,
+}
+
+#[derive(Serialize)]
+struct AccountInfo {
+    id: String,
+    nonce: u64,
+    data: Vec<String>,
+    keys: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct ListAccountsResponse {
+    accounts: Vec<AccountInfo>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -77,6 +91,11 @@ struct GetKeyRequest {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+struct AddAccountRequest {
+    id: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 struct GetKeyResponse {
     key: Vec<String>,
 }
@@ -93,6 +112,7 @@ pub async fn run_server(app_state: Arc<AppState>, config: AppConfig) {
     let app = Router::new()
         .route("/v1/health", get(health_check_handler))
         .route("/v1/account/get", get(get_account_handler))
+        .route("/v1/account/add-manual", post(add_account_handler))
         .route("/v1/account/get-key", get(get_key_handler))
         .route("/v1/account/get-data", get(get_data_handler))
         .route("/v1/account/send-create", post(send_create_account_handler))
@@ -143,7 +163,7 @@ async fn send_create_account_handler(
         .await
         .map_err(|e| AppError(anyhow::anyhow!("Failed to send account creation: {}", e)))?;
 
-    Ok((StatusCode::OK, Json(AccountResponse { id: account.id().to_string() })))
+    Ok((StatusCode::OK, Json(AccountResult { id: account.id().to_string() })))
 }
 
 async fn add_key_handler(
@@ -157,7 +177,7 @@ async fn add_key_handler(
         .await
         .map_err(|e| AppError(anyhow::anyhow!("Failed to add key: {}", e)))?;
 
-    Ok((StatusCode::OK, Json(AccountResponse { id: account.id().to_string() })))
+    Ok((StatusCode::OK, Json(AccountResult { id: account.id().to_string() })))
 }
 
 async fn get_data_handler(
@@ -184,7 +204,7 @@ async fn add_data_handler(
 ) -> HandlerResult<impl IntoResponse> {
     let state = state.clone();
     state.db.clone().insert_data(req.id.clone(), req.data.clone());
-    Ok((StatusCode::OK, Json(AccountResponse { id: req.id })))
+    Ok((StatusCode::OK, Json(AccountResult { id: req.id })))
 }
 
 async fn get_account_handler(
@@ -200,13 +220,42 @@ async fn get_account_handler(
     Ok((StatusCode::OK, Json(account)))
 }
 
+async fn add_account_handler(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AddAccountRequest>,
+) -> HandlerResult<impl IntoResponse> {
+    let state = state.clone();
+    state.db.clone().insert_account(req.id.clone(), Account::default());
+    Ok((StatusCode::OK, Json(AccountResult { id: req.id })))
+}
+
 async fn list_accounts_handler(
     State(state): State<Arc<AppState>>,
 ) -> HandlerResult<impl IntoResponse> {
     let state = state.clone();
     let accounts = state.db.clone().get_accounts();
 
-    Ok((StatusCode::OK, Json(accounts)))
+    let mut accounts_info = Vec::new();
+    for id in accounts {
+        match get_account(state.clone(), id.clone()).await {
+            Ok(account) => {
+                let keys = state.db.clone().get_keys(id.clone());
+                let data = state.db.clone().get_data(id.clone());
+                accounts_info.push(AccountInfo {
+                    id: id.clone(),
+                    keys,
+                    data,
+                    nonce: account.account.unwrap_or_default().nonce(),
+                });
+            }
+            Err(e) => {
+                tracing::warn!("Failed to get account for {}: {}", id, e);
+                continue; // Skip this account and continue with the next
+            }
+        }
+    }
+
+    Ok((StatusCode::OK, Json(ListAccountsResponse { accounts: accounts_info })))
 }
 
 async fn list_keys_handler(
